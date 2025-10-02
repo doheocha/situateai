@@ -43,6 +43,8 @@
   </div>
 
   <!-- html-to-image for PNG export -->
+  <!-- html-to-image library -->
+<script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
   <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
 
   <script>
@@ -89,6 +91,7 @@
       a.click();
       URL.revokeObjectURL(url);
     });
+    
 
     // ------- Download PNG of card -------
     // Helpers to avoid canvas taint with external images
