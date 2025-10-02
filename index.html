@@ -22,7 +22,12 @@
       box-shadow: 0 8px 24px rgba(0,0,0,.08);
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 16px;
+    }
+    .logo {
+      height: 60px;
+      object-fit: contain;
+      margin-bottom: 10px;
     }
     h2 {
       margin: 0;
@@ -39,17 +44,22 @@
       border: 1px solid #ddd;
       border-radius: 10px;
     }
-    .links {
-      text-align: left;
-    }
-    .links a {
-      color: #2563eb;
-      text-decoration: none;
+    .button {
+      display: inline-block;
+      background: linear-gradient(90deg, #6a11cb, #2575fc);
+      color: #fff;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
+      padding: 10px 18px;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: background 0.2s ease;
     }
-    .links p {
-      margin: 4px 0 0;
+    .button:hover {
+      background: linear-gradient(90deg, #5a0fb0, #1e63d9);
+    }
+    .shortlink {
+      margin: 6px 0 0;
       font-size: 0.8rem;
       color: #333;
     }
@@ -62,14 +72,23 @@
 </head>
 <body>
   <div class="card">
+    <!-- Logo -->
+    <img src="https://raw.githubusercontent.com/doheocha/situateai/main/SituateAI%20Vertical%20Logo.png" 
+         alt="SituateAI Logo" class="logo">
+
+    <!-- Title -->
     <h2 id="title"></h2>
+
+    <!-- QR + Button -->
     <div class="row">
       <img id="qr" src="" alt="QR Code" width="150" height="150">
-      <div class="links">
-        <a id="link" href="#" target="_blank">Open link</a>
-        <p id="shortlink"></p>
+      <div>
+        <a id="linkButton" href="#" target="_blank" class="button">Open Scenario</a>
+        <p id="shortlink" class="shortlink"></p>
       </div>
     </div>
+
+    <!-- Footer -->
     <div class="foot">
       🔒 Your responses are logged privately and only shared with your trainer.
     </div>
@@ -80,16 +99,22 @@
     // Parse query params
     const params = new URLSearchParams(window.location.search);
     const title = params.get("title") || "";
-    const qr = params.get("qr") || "";
     const link = params.get("link") || "";
+    const qr = params.get("qr") || 
+      (link ? `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(link)}&size=150x150` : "");
 
     // Fill in the card
     document.getElementById("title").textContent = title;
-    document.getElementById("qr").src = qr;
-    document.getElementById("link").href = link;
-    document.getElementById("link").textContent = link;
+    if (qr) document.getElementById("qr").src = qr;
+    if (link) {
+      const linkButton = document.getElementById("linkButton");
+      linkButton.href = link;
+      linkButton.style.display = "inline-block";
+    } else {
+      document.getElementById("linkButton").style.display = "none";
+    }
 
-    // Show short link if it's a bit.ly or shortened form
+    // Show shortlink if it's a bit.ly or just a small link
     const shortlink = (link.includes("bit.ly") || link.length < 40) ? link : "";
     document.getElementById("shortlink").textContent = shortlink;
   </script>
