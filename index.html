@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SituateAI Access Card</title>
+  <style>
+    body {
+      margin: 0;
+      background: #fff;
+      font-family: Montserrat, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      width: 400px;
+      border: 1px solid #eee;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,.08);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+    }
+    .row img {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+    }
+    .links {
+      text-align: left;
+    }
+    .links a {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .links p {
+      margin: 4px 0 0;
+      font-size: 0.8rem;
+      color: #333;
+    }
+    .foot {
+      font-size: 0.75rem;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 id="title"></h2>
+    <div class="row">
+      <img id="qr" src="" alt="QR Code" width="150" height="150">
+      <div class="links">
+        <a id="link" href="#" target="_blank">Open link</a>
+        <p id="shortlink"></p>
+      </div>
+    </div>
+    <div class="foot">
+      🔒 Your responses are logged privately and only shared with your trainer.
+    </div>
+    <div class="foot">Powered by <strong>SituateAI</strong></div>
+  </div>
+
+  <script>
+    // Parse query params
+    const params = new URLSearchParams(window.location.search);
+    const title = params.get("title") || "";
+    const qr = params.get("qr") || "";
+    const link = params.get("link") || "";
+
+    // Fill in the card
+    document.getElementById("title").textContent = title;
+    document.getElementById("qr").src = qr;
+    document.getElementById("link").href = link;
+    document.getElementById("link").textContent = link;
+
+    // Show short link if it's a bit.ly or shortened form
+    const shortlink = (link.includes("bit.ly") || link.length < 40) ? link : "";
+    document.getElementById("shortlink").textContent = shortlink;
+  </script>
+</body>
+</html>
