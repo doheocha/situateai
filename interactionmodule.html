@@ -1,105 +1,87 @@
-<div id="central-widget"></div>
-
-<!-- SituateAI n8n custom stylesheet -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" />
-" />
+<div id="situate-assistant"></div>
 
 <script>
 (function () {
-  const el = document.getElementById("central-widget");
-  if (!el) return;
-
-  const WEBHOOK_URL = "https://brd.app.n8n.cloud/webhook/60360755-53ae-4fc2-be23-7ad01e8e66c2"; // no /chat
+  // —— CONFIG ——
+  // Use your HOSTED /chat URL here:
+  const HOSTED_CHAT_URL = "https://brd.app.n8n.cloud/webhook/60360755-53ae-4fc2-be23-7ad01e8e66c2/chat";
+  // ElevenLabs
   const ELEVENLABS_AGENT_ID = "agent_01jvx2jt9pf9vbs7k64s6dn50y";
 
-  // Shell with flexible height (uses 90vh instead of a fixed px)
-  el.innerHTML = `
-    <div style="
-      width:min(900px,92vw);
-      height:90vh;
-      margin:4rem auto;
-      border-radius:16px;
-      overflow:hidden;
-      box-shadow:0 24px 60px rgba(0,0,0,.35);
-      background:#0b0f1a;
-      color:#fff;
-      font-family:Montserrat, system-ui, sans-serif;
-      display:flex;
-      flex-direction:column;">
-      
-      <div style="flex:0 0 52px;display:flex;align-items:center;gap:8px;
-                  padding:12px 14px;
-                  background:linear-gradient(90deg,#6a11cb,#2575fc);">
+  // —— SHELL (no external CSS; simple inline so WP doesn’t strip it) ——
+  const host = document.getElementById("situate-assistant");
+  if (!host) return;
+
+  host.innerHTML = `
+    <section style="width:min(900px,92vw);height:90vh;margin:4rem auto;border-radius:16px;
+                    overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35);background:#0b0f1a;
+                    color:#fff;display:flex;flex-direction:column;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;">
+      <header style="flex:0 0 52px;display:flex;align-items:center;gap:8px;padding:12px 14px;
+                     background:linear-gradient(90deg,#6a11cb,#2575fc);">
         <div style="font-weight:700">Interactive Assistant</div>
         <div style="flex:1"></div>
-        <div id="tabs" style="display:flex;gap:8px;background:rgba(255,255,255,.12);
-                              padding:6px;border-radius:12px">
-          <button id="tabText"  style="border:0;border-radius:10px;padding:8px 12px;
-                                       color:#fff;background:rgba(0,0,0,.18);
-                                       font-weight:600;cursor:pointer">Text</button>
-          <button id="tabVoice" style="border:0;border-radius:10px;padding:8px 12px;
-                                       color:#fff;background:transparent;
-                                       font-weight:600;cursor:pointer">Voice</button>
-        </div>
-      </div>
-      
-      <div id="stage" style="flex:1;position:relative;">
-        <div id="mount" style="position:absolute;inset:0;"></div>
-        <div id="err" style="display:none;position:absolute;left:12px;right:12px;bottom:12px;
-                             background:#2b1b1b;color:#ffd4d4;border:1px solid #a33;
-                             border-radius:10px;padding:10px 12px;font-size:13px"></div>
-      </div>
-    </div>
+        <nav style="display:flex;gap:8px;background:rgba(255,255,255,.12);padding:6px;border-radius:12px">
+          <button id="saTabText"  style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:rgba(0,0,0,.18);font-weight:600;cursor:pointer">Text</button>
+          <button id="saTabVoice" style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:transparent;font-weight:600;cursor:pointer">Voice</button>
+        </nav>
+      </header>
+
+      <main id="saStage" style="position:relative;flex:1;min-height:0;">
+        <div id="saMount" style="position:absolute;inset:0;"></div>
+        <div id="saErr" style="display:none;position:absolute;left:12px;right:12px;bottom:12px;background:#2b1b1b;color:#ffd4d4;border:1px solid #a33;border-radius:10px;padding:10px 12px;font-size:13px"></div>
+      </main>
+    </section>
   `;
 
-  const mount   = el.querySelector("#mount");
-  const tabText = el.querySelector("#tabText");
-  const tabVoice= el.querySelector("#tabVoice");
-  const errBox  = el.querySelector("#err");
+  const mount   = host.querySelector("#saMount");
+  const errBox  = host.querySelector("#saErr");
+  const tabText = host.querySelector("#saTabText");
+  const tabVoice= host.querySelector("#saTabVoice");
 
-  const setActive = (which) => {
+  function setActive(which) {
     tabText.style.background  = which === "text"  ? "rgba(0,0,0,.18)" : "transparent";
     tabVoice.style.background = which === "voice" ? "rgba(0,0,0,.18)" : "transparent";
-  };
-
-  const showError = (msg) => { errBox.textContent = msg; errBox.style.display = "block"; };
-  const clearError = () => { errBox.style.display = "none"; };
+  }
+  function showError(msg) { errBox.textContent = msg; errBox.style.display = "block"; }
+  function clearError()    { errBox.style.display = "none"; }
 
   function clearStage() {
     clearError();
-    document.querySelectorAll(".n8n-chat").forEach(n => n.remove());
-    mount.querySelectorAll("elevenlabs-convai").forEach(n => n.remove());
-    document.querySelectorAll("script[data-injected='1']").forEach(s => s.remove());
+    mount.innerHTML = "";
+    // clean any previously added scripts
+    document.querySelectorAll("script[data-sa-embed='1']").forEach(s => s.remove());
   }
 
-  // TEXT CHAT
+  // —— TEXT: embed the HOSTED /chat page in an iframe ——
   function loadText() {
     clearStage();
     setActive("text");
 
-    const s = document.createElement("script");
-    s.type = "module";
-    s.dataset.injected = "1";
-    s.textContent = `
-      import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-      const opts = {
-        webhookUrl: ${JSON.stringify(WEBHOOK_URL)},
-        target: '#mount',
-        mode: 'fullscreen',
-        showWelcomeScreen: true,
-        defaultLanguage: 'en',
-        initialMessages: []
-      };
-      try { createChat(opts); }
-      catch { createChat({ ...opts, containerSelector: '#mount' }); }
-    `;
-    s.onerror = () => {
-      showError("Could not load @n8n/chat. Check CSP (allow cdn.jsdelivr.net) and that your Chat Trigger’s Allowed Origin includes this page.");
-    };
-    document.body.appendChild(s);
+    const iframe = document.createElement("iframe");
+    iframe.src = HOSTED_CHAT_URL;
+    iframe.title = "n8n Hosted Chat";
+    iframe.style.position = "absolute";
+    iframe.style.inset = "0";
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "0";
+    // allow mic/camera/etc if your hosted page needs them
+    iframe.allow = "clipboard-write; microphone; camera; display-capture";
+
+    // If the hosted page refuses to be framed, browsers will blank it.
+    // We’ll detect a failure after a short delay and show a hint.
+    let loaded = false;
+    iframe.addEventListener("load", () => { loaded = true; });
+    setTimeout(() => {
+      if (!loaded) {
+        showError("We couldn’t embed the hosted chat. Your n8n instance likely sets 'X-Frame-Options' or 'Content-Security-Policy: frame-ancestors' to block embedding. Either switch to the embedded SDK mode (createChat with webhook), or allow this site to frame the hosted page.");
+      }
+    }, 1200);
+
+    mount.appendChild(iframe);
   }
 
-  // VOICE (ElevenLabs)
+  // —— VOICE: ElevenLabs inside the same block ——
   function loadVoice() {
     clearStage();
     setActive("voice");
@@ -113,12 +95,12 @@
       const s = document.createElement("script");
       s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
       s.async = true;
-      s.dataset.injected = "1";
+      s.setAttribute("data-sa-embed", "1");
       document.body.appendChild(s);
     }
   }
 
-  // Default = Text
+  // Default tab = Text (hosted chat)
   loadText();
   tabText.addEventListener("click", loadText);
   tabVoice.addEventListener("click", loadVoice);
