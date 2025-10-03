@@ -77,11 +77,12 @@
     s.dataset.injected = "1";
     s.textContent = `
       import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-      createChat({
-        webhookUrl: ${JSON.stringify(chat.webhookUrl)},
-        // Key bit: render inside our module instead of floating
-        target: '#n8n-mount',
-        mode: 'window',
+       createChat({
+  webhookUrl: '...',
+  containerSelector: '#n8n-mount',
+  mode: 'window',
+  // ...rest
+
         showWelcomeScreen: ${JSON.stringify(chat.showWelcomeScreen)},
         defaultLanguage: ${JSON.stringify(chat.defaultLanguage)},
         initialMessages: ${JSON.stringify(chat.initialMessages)},
