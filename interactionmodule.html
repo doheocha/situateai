@@ -1,271 +1,109 @@
-<!-- Central Interaction Module -->
-<div id="interaction-module"></div>
+<div id="central-widget"></div>
 
 <script>
 (function () {
-  // ======================
-  // CONFIG
-  // ======================
-  const config = {
-    width:  "min(900px, 92vw)",
-    height: "640px",
-    brand: {
-      primary: "#6a11cb",
-      secondary: "#2575fc",
-      bg: "#0b0f1a",
-      text: "#ffffff"
-    },
-    // TEXT CHAT (n8n)
-    chat: {
-      webhookUrl: "https://infranodus.app.n8n.cloud/webhook/0a59eb8e-d075-45f5-b374-c8315877bc28/chat",
-      showWelcomeScreen: false,
-      defaultLanguage: "en",
-      initialMessages: ["Talk to the Books of Dmitry Paranyushkin","What would you like to discuss?"],
-      i18n: {
-        title: "Talk to the Books of Dmitry Paranyushkin",
-        subtitle: "What would you like to discuss?",
-        footer: "",
-        getStarted: "New Conversation",
-        inputPlaceholder: "Type your message…"
-      }
-    },
-    // VOICE (ElevenLabs)
-    voice: {
-      // Any ElevenLabs "talk-to" URL that carries ?agent_id=...
-      callUrl: "https://elevenlabs.io/app/talk-to?agent_id=agent_01jvx2jt9pf9vbs7k64s6dn50y"
-    }
+  const el = document.getElementById("central-widget");
+  if (!el) return;
+
+  const brand = { primary:"#6a11cb", secondary:"#2575fc", bg:"#0b0f1a", text:"#fff" };
+  const chat = {
+    webhookUrl: "https://infranodus.app.n8n.cloud/webhook/0a59eb8e-d075-45f5-b374-c8315877bc28/chat",
+    showWelcomeScreen: false, defaultLanguage:"en",
+    initialMessages: ["Talk to the Books of Dmitry Paranyushkin","What would you like to discuss?"],
+    i18n: { title:"Interactive Assistant", subtitle:"What would you like to discuss?", footer:"", getStarted:"New Conversation", inputPlaceholder:"Type your message…" }
   };
+  const callUrl = "https://elevenlabs.io/app/talk-to?agent_id=agent_01jvx2jt9pf9vbs7k64s6dn50y";
+  const agentId = (function(u){try{return new URL(u).searchParams.get("agent_id")||"";}catch{return ""}})(callUrl) || "agent_01jvx2jt9pf9vbs7k64s6dn50y";
 
-  // ======================
-  // BOOTSTRAP CONTAINER
-  // ======================
-  const host = document.getElementById("interaction-module");
-  if (!host) return;
-
-  host.style.position = "relative";
-  host.style.margin = "4rem auto";
-  host.style.width = config.width;
-  host.style.maxWidth = "100%";
-  host.style.borderRadius = "16px";
-  host.style.boxShadow = "0 24px 60px rgba(0,0,0,0.35)";
-  host.style.overflow = "hidden";
-  host.style.background = `linear-gradient(90deg, ${config.brand.primary}, ${config.brand.secondary})`;
-
-  // Create an iframe and fully render UI inside (sandboxed)
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("title", "Conversation Module");
-  iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups");
-  iframe.style.width = "100%";
-  iframe.style.height = config.height;
-  iframe.style.border = "0";
-  host.appendChild(iframe);
-
-  // Extract agent id
-  function getAgentId(url) {
-    try { return new URL(url).searchParams.get("agent_id"); }
-    catch { return null; }
-  }
-  const agentId = getAgentId(config.voice.callUrl) || "agent_01jvx2jt9pf9vbs7k64s6dn50y";
-
-  // ======================
-  // IFRAME CONTENT (srcdoc)
-  // ======================
-  const html = String.raw`
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="preconnect" href="https://unpkg.com" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css">
-<style>
-  :root {
-    --brand-bg: ${config.brand.bg};
-    --brand-text: ${config.brand.text};
-    --brand-primary: ${config.brand.primary};
-    --brand-secondary: ${config.brand.secondary};
-  }
-  html, body {
-    margin:0; height:100%; background: var(--brand-bg); color: var(--brand-text);
-    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
-  }
-  .shell {
-    display:flex; flex-direction:column; height:100%;
-    background:
-      radial-gradient(1200px 600px at 0% 100%, rgba(255,255,255,0.06), transparent 60%),
-      radial-gradient(1200px 600px at 100% 0%, rgba(255,255,255,0.06), transparent 60%);
-  }
-  .toolbar {
-    display:flex; align-items:center; gap:.5rem; padding:12px 14px;
-    background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
-  }
-  .title {
-    font-weight:700; letter-spacing:.2px;
-  }
-  .spacer { flex:1; }
-  .mode {
-    display:flex; gap:8px; align-items:center;
-    background: rgba(255,255,255,0.12); padding:6px; border-radius:12px;
-  }
-  .btn {
-    border:0; border-radius:10px; padding:8px 12px; cursor:pointer;
-    color:#fff; background: transparent; font-weight:600;
-    transition: all .2s ease;
-  }
-  .btn.active, .btn:hover { background: rgba(0,0,0,0.18); }
-  .stage { flex:1; position:relative; }
-  .stage > .fill {
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  }
-  .placeholder {
-    opacity:.8; text-align:center; line-height:1.6; padding:24px;
-  }
-  /* Hosted widgets surface inside this container */
-  #mount { position:absolute; inset:0; overflow:auto; }
-  /* n8n chat container typically uses .n8n-chat on the document body; we scope by existence only */
-</style>
-</head>
-<body>
-  <div class="shell">
-    <div class="toolbar">
-      <div class="title">Interactive Assistant</div>
-      <div class="spacer"></div>
-      <div class="mode" role="tablist" aria-label="Mode selector">
-        <button id="tab-text" class="btn active" role="tab" aria-selected="true">Text</button>
-        <button id="tab-voice" class="btn" role="tab" aria-selected="false">Voice</button>
-      </div>
-    </div>
-    <div class="stage">
-      <div id="mount"></div>
-      <div class="fill" id="placeholder">
-        <div class="placeholder">
-          Choose <strong>Text</strong> or <strong>Voice</strong> above to start.
+  el.innerHTML = `
+    <div style="width:min(900px,92vw);height:640px;margin:4rem auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35);background:${brand.bg};color:${brand.text};">
+      <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(90deg,${brand.primary},${brand.secondary});">
+        <div style="font-weight:700">Interactive Assistant</div>
+        <div style="flex:1"></div>
+        <div id="tabs" style="display:flex;gap:8px;background:rgba(255,255,255,.12);padding:6px;border-radius:12px">
+          <button id="tabText" style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:rgba(0,0,0,.18);font-weight:600;cursor:pointer">Text</button>
+          <button id="tabVoice" style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:transparent;font-weight:600;cursor:pointer">Voice</button>
         </div>
       </div>
+      <div id="stage" style="position:relative;height:calc(100% - 52px)">
+        <div id="mount" style="position:absolute;inset:0;overflow:auto"></div>
+        <div id="hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.8">Choose Text or Voice above to start.</div>
+      </div>
     </div>
-  </div>
-
-  <script type="module">
-    // --------------------------
-    // LIGHT STATE & HELPERS
-    // --------------------------
-    const state = { mode: "text" };
-    const mount = document.getElementById("mount");
-    const placeholder = document.getElementById("placeholder");
-    const tabText = document.getElementById("tab-text");
-    const tabVoice = document.getElementById("tab-voice");
-
-    function clearMount() {
-      // Remove n8n chat container if present
-      const n8nChat = document.querySelector(".n8n-chat");
-      if (n8nChat) n8nChat.remove();
-      // Remove ElevenLabs if present
-      document.querySelectorAll("elevenlabs-convai").forEach((el) => el.remove());
-      // Remove widget loader scripts (we keep CSS; no harm)
-      document.querySelectorAll("script[data-injected='1']").forEach(s => s.remove());
-      placeholder.style.display = "flex";
-    }
-
-    function setActive(tab) {
-      [tabText, tabVoice].forEach(btn => {
-        btn.classList.toggle("active", btn === tab);
-        btn.setAttribute("aria-selected", btn === tab ? "true" : "false");
-      });
-    }
-
-    // --------------------------
-    // TEXT MODE (n8n Chat)
-    // --------------------------
-    async function loadTextChat() {
-      clearMount();
-      placeholder.style.display = "none";
-
-      // Dynamically import the n8n chat bundle inside the iframe
-      const script = document.createElement("script");
-      script.type = "module";
-      script.dataset.injected = "1";
-      script.textContent = `
-        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-        createChat({
-          webhookUrl: ${JSON.stringify(config.chat.webhookUrl)},
-          showWelcomeScreen: ${JSON.stringify(config.chat.showWelcomeScreen)},
-          defaultLanguage: ${JSON.stringify(config.chat.defaultLanguage)},
-          initialMessages: ${JSON.stringify(config.chat.initialMessages)},
-          i18n: {
-            ${JSON.stringify(config.chat.defaultLanguage)}: {
-              title: ${JSON.stringify(config.chat.i18n.title)},
-              subtitle: ${JSON.stringify(config.chat.i18n.subtitle)},
-              footer: ${JSON.stringify(config.chat.i18n.footer)},
-              getStarted: ${JSON.stringify(config.chat.i18n.getStarted)},
-              inputPlaceholder: ${JSON.stringify(config.chat.i18n.inputPlaceholder)}
-            }
-          }
-        });
-      `;
-      document.body.appendChild(script);
-    }
-
-    // --------------------------
-    // VOICE MODE (ElevenLabs)
-    // --------------------------
-    async function loadVoice() {
-      clearMount();
-      placeholder.style.display = "none";
-
-      // Create the convai element inside our iframe
-      const convai = document.createElement("elevenlabs-convai");
-      convai.setAttribute("agent-id", ${JSON.stringify(agentId)});
-      convai.style.position = "absolute";
-      convai.style.inset = "0";
-      convai.style.width = "100%";
-      convai.style.height = "100%";
-      mount.appendChild(convai);
-
-      // Load the ElevenLabs embed script
-      const s = document.createElement("script");
-      s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
-      s.async = true;
-      s.dataset.injected = "1";
-      document.body.appendChild(s);
-    }
-
-    // Initial mode (Text)
-    loadTextChat();
-
-    tabText.addEventListener("click", () => {
-      if (state.mode !== "text") {
-        state.mode = "text";
-        setActive(tabText);
-        loadTextChat();
-      }
-    });
-
-    tabVoice.addEventListener("click", () => {
-      if (state.mode !== "voice") {
-        state.mode = "voice";
-        setActive(tabVoice);
-        loadVoice();
-      }
-    });
-  </script>
-
-  <script>
-    // Make top-level config available inside iframe module script
-    const config = ${JSON.stringify(config)};
-    const agentId = ${JSON.stringify(agentId)};
-  </script>
-</body>
-</html>
   `;
 
-  // Write into iframe
-  // Use srcdoc when available; fallback to .contentDocument write
-  if ("srcdoc" in iframe) {
-    iframe.srcdoc = html;
-  } else {
-    const doc = iframe.contentWindow.document;
-    doc.open(); doc.write(html); doc.close();
+  const mount = el.querySelector("#mount");
+  const hint = el.querySelector("#hint");
+  const tabText = el.querySelector("#tabText");
+  const tabVoice = el.querySelector("#tabVoice");
+
+  function clear() {
+    const n8nChat = document.querySelector(".n8n-chat");
+    if (n8nChat) n8nChat.remove();
+    document.querySelectorAll("elevenlabs-convai").forEach(el => el.remove());
+    document.querySelectorAll("script[data-injected='1']").forEach(s => s.remove());
+    hint.style.display = "flex";
+    tabText.style.background = "rgba(0,0,0,.18)";
+    tabVoice.style.background = "transparent";
   }
+
+  function loadText() {
+    clear();
+    hint.style.display = "none";
+
+    // ensure n8n css present
+    if (!document.querySelector('link[href*="@n8n/chat/dist/style.css"]')) {
+      const link = document.createElement("link");
+      link.rel="stylesheet";
+      link.href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css";
+      document.head.appendChild(link);
+    }
+    const s = document.createElement("script");
+    s.type = "module";
+    s.dataset.injected="1";
+    s.textContent = `
+      import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+      createChat({
+        webhookUrl: ${JSON.stringify(chat.webhookUrl)},
+        showWelcomeScreen: ${JSON.stringify(chat.showWelcomeScreen)},
+        defaultLanguage: ${JSON.stringify(chat.defaultLanguage)},
+        initialMessages: ${JSON.stringify(chat.initialMessages)},
+        i18n: { ${JSON.stringify(chat.defaultLanguage)}: {
+          title:${JSON.stringify(chat.i18n.title)},
+          subtitle:${JSON.stringify(chat.i18n.subtitle)},
+          footer:${JSON.stringify(chat.i18n.footer)},
+          getStarted:${JSON.stringify(chat.i18n.getStarted)},
+          inputPlaceholder:${JSON.stringify(chat.i18n.inputPlaceholder)}
+        } }
+      });
+    `;
+    document.body.appendChild(s);
+  }
+
+  function loadVoice() {
+    clear();
+    hint.style.display = "none";
+    tabText.style.background = "transparent";
+    tabVoice.style.background = "rgba(0,0,0,.18)";
+
+    const convai = document.createElement("elevenlabs-convai");
+    convai.setAttribute("agent-id", agentId);
+    convai.style.position = "absolute";
+    convai.style.inset = "0";
+    convai.style.width = "100%";
+    convai.style.height = "100%";
+    mount.appendChild(convai);
+
+    const s = document.createElement("script");
+    s.src = "https://unpkg.com/@elevenlabs/convai-widget-embed";
+    s.async = true;
+    s.dataset.injected = "1";
+    document.body.appendChild(s);
+  }
+
+  // default to Text
+  loadText();
+  tabText.addEventListener("click", loadText);
+  tabVoice.addEventListener("click", loadVoice);
 })();
 </script>
