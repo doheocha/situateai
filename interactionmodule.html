@@ -1,5 +1,7 @@
+<!-- Central inline module -->
 <div id="central-widget"></div>
 
+<!-- n8n chat styles (needed once per page) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" />
 
 <script>
@@ -7,37 +9,25 @@
   const el = document.getElementById("central-widget");
   if (!el) return;
 
+  // —— CONFIG ——
   const brand = { primary:"#6a11cb", secondary:"#2575fc", bg:"#0b0f1a", text:"#fff" };
-  const chat = {
-    // Your n8n Chat Trigger webhook (with /chat if you’re using hosted mode)
-    webhookUrl: "https://infranodus.app.n8n.cloud/webhook/0a59eb8e-d075-45f5-b374-c8315877bc28/chat",
-    showWelcomeScreen: false,
-    defaultLanguage:"en",
-    initialMessages: [
-      "Talk to the Books of Dmitry Paranyushkin",
-      "What would you like to discuss?"
-    ],
-    i18n: {
-      title:"Interactive Assistant",
-      subtitle:"What would you like to discuss?",
-      footer:"",
-      getStarted:"New Conversation",
-      inputPlaceholder:"Type your message…"
-    }
-  };
 
+  // Your n8n Chat Trigger webhook (use the one you were iframing earlier, but without iframing)
+  const webhookUrl = "https://brd.app.n8n.cloud/webhook/60360755-53ae-4fc2-be23-7ad01e8e66c2/chat";
+
+  // ElevenLabs Voice
   const callUrl = "https://elevenlabs.io/app/talk-to?agent_id=agent_01jvx2jt9pf9vbs7k64s6dn50y";
-  const agentId = (u => { try { return new URL(u).searchParams.get("agent_id") || ""; } catch { return ""; } })(callUrl)
-                  || "agent_01jvx2jt9pf9vbs7k64s6dn50y";
+  const agentId = (() => { try { return new URL(callUrl).searchParams.get("agent_id") || ""; } catch { return ""; } })()
+                || "agent_01jvx2jt9pf9vbs7k64s6dn50y";
 
-  // Shell UI
+  // —— SHELL UI ——
   el.innerHTML = `
     <div style="width:min(900px,92vw);height:640px;margin:4rem auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35);background:${brand.bg};color:${brand.text};">
       <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(90deg,${brand.primary},${brand.secondary});">
         <div style="font-weight:700">Interactive Assistant</div>
         <div style="flex:1"></div>
         <div id="tabs" style="display:flex;gap:8px;background:rgba(255,255,255,.12);padding:6px;border-radius:12px">
-          <button id="tabText" style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:rgba(0,0,0,.18);font-weight:600;cursor:pointer">Text</button>
+          <button id="tabText"  style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:rgba(0,0,0,.18);font-weight:600;cursor:pointer">Text</button>
           <button id="tabVoice" style="border:0;border-radius:10px;padding:8px 12px;color:#fff;background:transparent;font-weight:600;cursor:pointer">Voice</button>
         </div>
       </div>
@@ -51,65 +41,72 @@
     </div>
   `;
 
-  const mount = el.querySelector("#n8n-mount");
-  const hint  = el.querySelector("#hint");
-  const tabText = el.querySelector("#tabText");
+  const mount    = el.querySelector("#n8n-mount");
+  const hint     = el.querySelector("#hint");
+  const tabText  = el.querySelector("#tabText");
   const tabVoice = el.querySelector("#tabVoice");
 
-  function clearStage() {
-    // Remove previous renders
-    const n8nChat = document.querySelector(".n8n-chat");
-    if (n8nChat) n8nChat.remove();
-    mount.querySelectorAll("elevenlabs-convai").forEach(el => el.remove());
-    document.querySelectorAll("script[data-injected='1']").forEach(s => s.remove());
-    hint.style.display = "flex";
-    tabText.style.background = "rgba(0,0,0,.18)";
-    tabVoice.style.background = "transparent";
+  function setActive(which) {
+    tabText.style.background  = which === "text"  ? "rgba(0,0,0,.18)" : "transparent";
+    tabVoice.style.background = which === "voice" ? "rgba(0,0,0,.18)" : "transparent";
   }
 
+  function clearStage() {
+    hint.style.display = "flex";
+    // Remove any previous n8n chat container (the SDK creates .n8n-chat)
+    document.querySelectorAll(".n8n-chat").forEach(n => n.remove());
+    // Remove any ElevenLabs widget
+    mount.querySelectorAll("elevenlabs-convai").forEach(n => n.remove());
+    // Remove inject scripts to avoid duplicates
+    document.querySelectorAll("script[data-injected='1']").forEach(s => s.remove());
+  }
+
+  // —— TEXT MODE: inline n8n chat inside #n8n-mount ——
   function loadText() {
     clearStage();
+    setActive("text");
     hint.style.display = "none";
 
-    // Inline embed: mount INSIDE #n8n-mount
+    // Load the ES module that mounts the chat in our container
     const s = document.createElement("script");
     s.type = "module";
     s.dataset.injected = "1";
     s.textContent = `
       import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-       createChat({
-  webhookUrl: '...',
-  containerSelector: '#n8n-mount',
-  mode: 'window',
-  // ...rest
 
-        showWelcomeScreen: ${JSON.stringify(chat.showWelcomeScreen)},
-        defaultLanguage: ${JSON.stringify(chat.defaultLanguage)},
-        initialMessages: ${JSON.stringify(chat.initialMessages)},
-        i18n: { ${JSON.stringify(chat.defaultLanguage)}: {
-          title:${JSON.stringify(chat.i18n.title)},
-          subtitle:${JSON.stringify(chat.i18n.subtitle)},
-          footer:${JSON.stringify(chat.i18n.footer)},
-          getStarted:${JSON.stringify(chat.i18n.getStarted)},
-          inputPlaceholder:${JSON.stringify(chat.i18n.inputPlaceholder)}
-        } }
-      });
+      // Some builds use "target", older ones use "containerSelector".
+      // We'll try "target" first and fall back if needed.
+      const opts = {
+        webhookUrl: ${JSON.stringify(webhookUrl)},
+        target: '#n8n-mount',
+        mode: 'window',
+        showWelcomeScreen: false,
+        defaultLanguage: 'en',
+        initialMessages: []
+      };
+
+      try {
+        createChat(opts);
+      } catch (e) {
+        // Fallback key
+        createChat({
+          ...opts,
+          containerSelector: '#n8n-mount'
+        });
+      }
     `;
     document.body.appendChild(s);
   }
 
+  // —— VOICE MODE: ElevenLabs ——
   function loadVoice() {
     clearStage();
+    setActive("voice");
     hint.style.display = "none";
-    tabText.style.background = "transparent";
-    tabVoice.style.background = "rgba(0,0,0,.18)";
 
     const convai = document.createElement("elevenlabs-convai");
     convai.setAttribute("agent-id", agentId);
-    convai.style.position = "absolute";
-    convai.style.inset = "0";
-    convai.style.width = "100%";
-    convai.style.height = "100%";
+    Object.assign(convai.style, { position:"absolute", inset:"0", width:"100%", height:"100%" });
     mount.appendChild(convai);
 
     const s = document.createElement("script");
