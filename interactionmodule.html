@@ -1,5 +1,7 @@
 <div id="central-widget"></div>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" />
+
 <script>
 (function () {
   const el = document.getElementById("central-widget");
@@ -7,14 +9,28 @@
 
   const brand = { primary:"#6a11cb", secondary:"#2575fc", bg:"#0b0f1a", text:"#fff" };
   const chat = {
+    // Your n8n Chat Trigger webhook (with /chat if you’re using hosted mode)
     webhookUrl: "https://infranodus.app.n8n.cloud/webhook/0a59eb8e-d075-45f5-b374-c8315877bc28/chat",
-    showWelcomeScreen: false, defaultLanguage:"en",
-    initialMessages: ["Talk to the Books of Dmitry Paranyushkin","What would you like to discuss?"],
-    i18n: { title:"Interactive Assistant", subtitle:"What would you like to discuss?", footer:"", getStarted:"New Conversation", inputPlaceholder:"Type your message…" }
+    showWelcomeScreen: false,
+    defaultLanguage:"en",
+    initialMessages: [
+      "Talk to the Books of Dmitry Paranyushkin",
+      "What would you like to discuss?"
+    ],
+    i18n: {
+      title:"Interactive Assistant",
+      subtitle:"What would you like to discuss?",
+      footer:"",
+      getStarted:"New Conversation",
+      inputPlaceholder:"Type your message…"
+    }
   };
-  const callUrl = "https://elevenlabs.io/app/talk-to?agent_id=agent_01jvx2jt9pf9vbs7k64s6dn50y";
-  const agentId = (function(u){try{return new URL(u).searchParams.get("agent_id")||"";}catch{return ""}})(callUrl) || "agent_01jvx2jt9pf9vbs7k64s6dn50y";
 
+  const callUrl = "https://elevenlabs.io/app/talk-to?agent_id=agent_01jvx2jt9pf9vbs7k64s6dn50y";
+  const agentId = (u => { try { return new URL(u).searchParams.get("agent_id") || ""; } catch { return ""; } })(callUrl)
+                  || "agent_01jvx2jt9pf9vbs7k64s6dn50y";
+
+  // Shell UI
   el.innerHTML = `
     <div style="width:min(900px,92vw);height:640px;margin:4rem auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35);background:${brand.bg};color:${brand.text};">
       <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(90deg,${brand.primary},${brand.secondary});">
@@ -26,21 +42,25 @@
         </div>
       </div>
       <div id="stage" style="position:relative;height:calc(100% - 52px)">
-        <div id="mount" style="position:absolute;inset:0;overflow:auto"></div>
-        <div id="hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.8">Choose Text or Voice above to start.</div>
+        <!-- Mount point where BOTH chat and voice render -->
+        <div id="n8n-mount" style="position:absolute;inset:0;overflow:auto"></div>
+        <div id="hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:.8">
+          Choose Text or Voice above to start.
+        </div>
       </div>
     </div>
   `;
 
-  const mount = el.querySelector("#mount");
-  const hint = el.querySelector("#hint");
+  const mount = el.querySelector("#n8n-mount");
+  const hint  = el.querySelector("#hint");
   const tabText = el.querySelector("#tabText");
   const tabVoice = el.querySelector("#tabVoice");
 
-  function clear() {
+  function clearStage() {
+    // Remove previous renders
     const n8nChat = document.querySelector(".n8n-chat");
     if (n8nChat) n8nChat.remove();
-    document.querySelectorAll("elevenlabs-convai").forEach(el => el.remove());
+    mount.querySelectorAll("elevenlabs-convai").forEach(el => el.remove());
     document.querySelectorAll("script[data-injected='1']").forEach(s => s.remove());
     hint.style.display = "flex";
     tabText.style.background = "rgba(0,0,0,.18)";
@@ -48,23 +68,20 @@
   }
 
   function loadText() {
-    clear();
+    clearStage();
     hint.style.display = "none";
 
-    // ensure n8n css present
-    if (!document.querySelector('link[href*="@n8n/chat/dist/style.css"]')) {
-      const link = document.createElement("link");
-      link.rel="stylesheet";
-      link.href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css";
-      document.head.appendChild(link);
-    }
+    // Inline embed: mount INSIDE #n8n-mount
     const s = document.createElement("script");
     s.type = "module";
-    s.dataset.injected="1";
+    s.dataset.injected = "1";
     s.textContent = `
       import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
       createChat({
         webhookUrl: ${JSON.stringify(chat.webhookUrl)},
+        // Key bit: render inside our module instead of floating
+        target: '#n8n-mount',
+        mode: 'window',
         showWelcomeScreen: ${JSON.stringify(chat.showWelcomeScreen)},
         defaultLanguage: ${JSON.stringify(chat.defaultLanguage)},
         initialMessages: ${JSON.stringify(chat.initialMessages)},
@@ -81,7 +98,7 @@
   }
 
   function loadVoice() {
-    clear();
+    clearStage();
     hint.style.display = "none";
     tabText.style.background = "transparent";
     tabVoice.style.background = "rgba(0,0,0,.18)";
@@ -101,7 +118,7 @@
     document.body.appendChild(s);
   }
 
-  // default to Text
+  // Default to Text
   loadText();
   tabText.addEventListener("click", loadText);
   tabVoice.addEventListener("click", loadVoice);
